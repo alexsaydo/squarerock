@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Расчет м²</title>
+	<link rel="manifest" href="manifest.json">
+<!-- Мета-теги для iOS (из предыдущего шага) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon.png">
+
+<script>
+  // Регистрируем Service Worker для офлайн-режима
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('Офлайн-режим готов!'))
+      .catch((err) => console.log('Ошибка SW:', err));
+  }
+</script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Roboto', system-ui, sans-serif;
+            background-color: #121212;
+            color: #fff;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .main-title {
+            font-size: 28px;
+            text-align: center;
+            margin: 15px 0 25px 0;
+        }
+
+        .total {
+            background-color: #1f1f1f;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .total-sum {
+            font-size: 26px;
+            font-weight: 500;
+            color: #4caf50;
+        }
+
+        .width-control {
+            background-color: #1f1f1f;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input {
+            background-color: #2a2a2a;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 10px;
+            color: white;
+            font-size: 17px;
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input:focus { outline: none; background-color: #3a3a3a; }
+
+        .col-headers {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 36px;
+            gap: 10px;
+            padding: 0 5px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .row {
+            background-color: #1f1f1f;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 36px;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .sum-cell {
+            font-weight: 500;
+            color: #4caf50;
+            font-size: 17px;
+            text-align: center;
+        }
+
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            background-color: #3a2020;
+            color: #f44336;
+            border: none;
+            border-radius: 8px;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .add-btn {
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 17px;
+            border-radius: 12px;
+            width: 100%;
+            margin: 15px 0;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .clear-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 17px;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+    </style>
+</head>
+<body>
+
+<h1 class="main-title">Расчет</h1>
+
+<div class="total">
+    <div>Общая площадь: <span id="total-sum" class="total-sum">0,000</span></div>
+    <div style="margin-top:8px">Всего позиций: <span id="total-qty">0</span></div>
+    <div style="margin-top:8px">Длина: <span id="length-range" class="total-sum" style="font-size:20px">—</span></div>
+</div>
+
+<div class="width-control">
+    <span>Ширина (м):</span>
+    <input id="width-input" type="text" inputmode="decimal" value="0.4"
+           style="flex:1;text-align:right">
+</div>
+
+<div class="col-headers">
+    <div>Длина</div>
+    <div>Кол-во</div>
+    <div>Площадь</div>
+    <div></div>
+</div>
+
+<div id="rows-container"></div>
+
+<button class="add-btn" id="add-btn">+ Добавить строку</button>
+<button class="clear-btn" id="clear-btn">Очистить всё</button>
+
+<script>
+(function () {
+    var rows = [{ length: '', quantity: '' }];
+
+    function toNum(v) {
+        if (v === '' || v === null || v === undefined) return 0;
+        return parseFloat(String(v).replace(',', '.')) || 0;
+    }
+
+    function fmt(n) {
+        return n.toFixed(3).replace('.', ',');
+    }
+
+    function getWidth() {
+        return toNum(document.getElementById('width-input').value);
+    }
+
+    function calcRow(row) {
+        return toNum(row.length) * toNum(row.quantity) * getWidth();
+    }
+
+    function updateTotals() {
+        var sum = 0, qty = 0;
+        for (var i = 0; i < rows.length; i++) {
+            sum += calcRow(rows[i]);
+            qty += toNum(rows[i].quantity);
+        }
+        document.getElementById('total-sum').textContent = fmt(sum);
+        document.getElementById('total-qty').textContent = (qty % 1 === 0) ? String(qty) : fmt(qty);
+
+        var lengths = rows.map(function(r) { return toNum(r.length); }).filter(function(v) { return v > 0; });
+        if (lengths.length > 0) {
+            var minL = Math.min.apply(null, lengths);
+            var maxL = Math.max.apply(null, lengths);
+            function fmt2(n) { return n.toFixed(2).replace('.', ','); }
+var rangeStr = minL === maxL ? fmt2(minL) : fmt2(minL) + ' — ' + fmt2(maxL);
+            document.getElementById('length-range').textContent = rangeStr;
+        } else {
+            document.getElementById('length-range').textContent = '—';
+        }
+    }
+
+    function render() {
+        var container = document.getElementById('rows-container');
+
+        while (container.children.length > rows.length) {
+            container.removeChild(container.lastChild);
+        }
+
+        for (var i = 0; i < rows.length; i++) {
+            var rowData = rows[i];
+            var rowEl = container.children[i];
+
+            if (!rowEl) {
+                rowEl = buildRowEl();
+                container.appendChild(rowEl);
+            }
+
+            var lenInp  = rowEl.querySelector('.inp-len');
+            var qtyInp  = rowEl.querySelector('.inp-qty');
+            var sumCell = rowEl.querySelector('.sum-cell');
+
+            if (document.activeElement !== lenInp)  lenInp.value = rowData.length;
+            if (document.activeElement !== qtyInp)  qtyInp.value = rowData.quantity;
+            sumCell.textContent = fmt(calcRow(rowData));
+        }
+
+        updateTotals();
+    }
+
+    function buildRowEl() {
+        var div = document.createElement('div');
+        div.className = 'row';
+
+        var lenInp = document.createElement('input');
+        lenInp.type = 'text';
+        lenInp.setAttribute('inputmode', 'decimal');
+        lenInp.placeholder = 'Длина';
+        lenInp.className = 'inp-len';
+
+        var qtyInp = document.createElement('input');
+        qtyInp.type = 'text';
+        qtyInp.setAttribute('inputmode', 'decimal');
+        qtyInp.placeholder = 'Кол-во';
+        qtyInp.className = 'inp-qty';
+
+        var sumCell = document.createElement('div');
+        sumCell.className = 'sum-cell';
+        sumCell.textContent = '0,000';
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.textContent = '×';
+
+        lenInp.addEventListener('input', function () {
+            var idx = rowIndex(div);
+            rows[idx].length = this.value;
+            div.querySelector('.sum-cell').textContent = fmt(calcRow(rows[idx]));
+            updateTotals();
+        });
+
+        lenInp.addEventListener('blur', function () {
+            var raw = this.value.replace(',', '.');
+            var val = parseFloat(raw);
+            if (!isNaN(val) && val >= 10 && raw.indexOf('.') === -1) {
+                val = val / 100;
+                this.value = fmt(val).replace(/,?0+$/, '');
+                var idx = rowIndex(div);
+                rows[idx].length = this.value;
+                div.querySelector('.sum-cell').textContent = fmt(calcRow(rows[idx]));
+                updateTotals();
+            }
+        });
+
+        qtyInp.addEventListener('input', function () {
+            var idx = rowIndex(div);
+            rows[idx].quantity = this.value;
+            div.querySelector('.sum-cell').textContent = fmt(calcRow(rows[idx]));
+            updateTotals();
+        });
+
+        delBtn.addEventListener('click', function () {
+            var idx = rowIndex(div);
+            if (rows.length === 1) {
+                rows[0] = { length: '', quantity: '' };
+            } else {
+                rows.splice(idx, 1);
+            }
+            render();
+        });
+
+        div.appendChild(lenInp);
+        div.appendChild(qtyInp);
+        div.appendChild(sumCell);
+        div.appendChild(delBtn);
+        return div;
+    }
+
+    function rowIndex(el) {
+        return Array.prototype.indexOf.call(
+            document.getElementById('rows-container').children, el
+        );
+    }
+
+    document.getElementById('add-btn').addEventListener('click', function () {
+        rows.push({ length: '', quantity: '' });
+        render();
+        var container = document.getElementById('rows-container');
+        var last = container.lastElementChild;
+        if (last) last.querySelector('.inp-len').focus();
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', function () {
+        if (confirm('Очистить все данные?')) {
+            rows = [{ length: '', quantity: '' }];
+            render();
+        }
+    });
+
+    document.getElementById('width-input').addEventListener('input', function () {
+        render();
+    });
+
+    render();
+})();
+</script>
+
+</body>
+</html>
