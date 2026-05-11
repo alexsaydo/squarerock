@@ -1,6 +1,6 @@
 {
-  "name": "Мое Приложение",
-  "short_name": "Приложение",
+  "name": "Расчет м^2",
+  "short_name": "Расчет м^2",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
